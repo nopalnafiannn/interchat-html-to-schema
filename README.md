@@ -3,6 +3,6 @@
 this is our AIPM project.
 
 Team members:
-Mohamad Naufal Nafian
-Akanksha Janna
+Mohamad Naufal Nafian,
+Akanksha Janna,
 Praneetha Pratapa
