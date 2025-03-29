@@ -1,0 +1,5 @@
+openai>=1.0.0
+tiktoken>=0.5.1
+python-dotenv>=1.0.0
+beautifulsoup4>=4.12.2
+argparse>=1.4.0

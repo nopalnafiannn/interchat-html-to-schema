@@ -1,0 +1,11 @@
+Metadata-Version: 2.1
+Name: html-dataset-analyzer
+Version: 0.1.0
+Summary: Extracts dataset information from HTML files using AI
+Author: Your Name
+Author-email: your.email@example.com
+Requires-Dist: openai>=1.0.0
+Requires-Dist: tiktoken>=0.5.1
+Requires-Dist: python-dotenv>=1.0.0
+Requires-Dist: beautifulsoup4>=4.12.2
+Requires-Dist: argparse>=1.4.0
