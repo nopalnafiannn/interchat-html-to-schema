@@ -1,0 +1,64 @@
+{
+  "variables": [
+    {
+      "name": "PassengerId",
+      "description": "Unique identifier for each passenger",
+      "data_type": "integer"
+    },
+    {
+      "name": "Survived",
+      "description": "Survival status (0 = No; 1 = Yes)",
+      "data_type": "boolean"
+    },
+    {
+      "name": "Pclass",
+      "description": "Passenger class (1 = 1st; 2 = 2nd; 3 = 3rd)",
+      "data_type": "integer"
+    },
+    {
+      "name": "Name",
+      "description": "Full name of the passenger",
+      "data_type": "string"
+    },
+    {
+      "name": "Sex",
+      "description": "Gender of the passenger (male or female)",
+      "data_type": "string"
+    },
+    {
+      "name": "Age",
+      "description": "Age of the passenger in years",
+      "data_type": "float"
+    },
+    {
+      "name": "SibSp",
+      "description": "Number of siblings or spouses aboard the Titanic",
+      "data_type": "integer"
+    },
+    {
+      "name": "Parch",
+      "description": "Number of parents or children aboard the Titanic",
+      "data_type": "integer"
+    },
+    {
+      "name": "Ticket",
+      "description": "Ticket number",
+      "data_type": "string"
+    },
+    {
+      "name": "Fare",
+      "description": "Ticket fare",
+      "data_type": "float"
+    },
+    {
+      "name": "Cabin",
+      "description": "Cabin number (if applicable)",
+      "data_type": "string"
+    },
+    {
+      "name": "Embarked",
+      "description": "Port of Embarkation (C = Cherbourg; Q = Queenstown; S = Southampton)",
+      "data_type": "string"
+    }
+  ]
+}
