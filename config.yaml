@@ -1,0 +1,29 @@
+# OpenAI API settings
+openai:
+  default_model: "gpt-3.5-turbo"
+  schema_model: "gpt-3.5-turbo-16k"
+  max_tokens: 1000
+  temperature: 0
+
+# HTML parsing settings
+html:
+  max_file_size_mb: 10
+  max_sample_rows: 5
+  
+# Schema settings
+schema:
+  output_formats:
+    - text
+    - json
+    - yaml
+  default_format: "json"
+  
+# Kaggle settings
+kaggle:
+  download_path: "kaggle_data"
+  
+# Metrics settings
+metrics:
+  track_latency: true
+  track_memory: true
+  track_tokens: true
