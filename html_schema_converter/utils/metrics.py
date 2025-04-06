@@ -1,92 +1,104 @@
-"""Metrics collection utilities for the HTML to Data Schema Converter."""
+"""Metrics tracking utilities."""
 
 import time
-import psutil
 import os
-from typing import Dict, Any, Callable, TypeVar, Optional
-import pandas as pd
+import psutil
+import functools
+from typing import Dict, Any, Callable, Optional
 
-# Type variable for the decorated function
-T = TypeVar('T')
-
-def measure_performance(agent_name: str) -> Callable[[Callable[..., T]], Callable[..., Dict[str, Any]]]:
+def track_metrics(func: Callable) -> Callable:
     """
-    Decorator to measure function performance.
+    Decorator to track performance metrics for functions.
     
     Args:
-        agent_name (str): Name of the agent being measured
+        func: Function to track
         
     Returns:
-        Callable: Decorator function
+        Wrapped function with metrics tracking
     """
-    def decorator(func: Callable[..., T]) -> Callable[..., Dict[str, Any]]:
-        def wrapper(*args, **kwargs) -> Dict[str, Any]:
-            # Measure start state
-            start_time = time.perf_counter()
-            process = psutil.Process(os.getpid())
-            mem_before = process.memory_info().rss / (1024 * 1024)  # MB
-            
-            # Call the function
-            result = func(*args, **kwargs)
-            
-            # Measure end state
-            end_time = time.perf_counter()
-            mem_after = process.memory_info().rss / (1024 * 1024)  # MB
-            
-            # Calculate metrics
-            latency = end_time - start_time
-            memory_used = mem_after - mem_before
-            
-            # Add metrics to result
-            metrics = {
-                "Agent": agent_name,
-                "Latency (s)": round(latency, 3),
-                "Memory Usage (MB)": round(memory_used, 3)
-            }
-            
-            if isinstance(result, dict):
-                if "metrics" in result:
-                    result["metrics"].update(metrics)
-                else:
-                    result["metrics"] = metrics
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        # Track start time and memory
+        start_time = time.perf_counter()
+        mem_before = psutil.Process(os.getpid()).memory_info().rss
+        
+        # Call the function
+        result = func(*args, **kwargs)
+        
+        # Calculate metrics
+        end_time = time.perf_counter()
+        mem_after = psutil.Process(os.getpid()).memory_info().rss
+        
+        latency = end_time - start_time
+        mem_usage = (mem_after - mem_before) / (1024 * 1024)  # Convert to MB
+        
+        # Add metrics to result if it's a dict
+        if isinstance(result, dict):
+            # If there's already a metrics dict, update it
+            if "metrics" in result and isinstance(result["metrics"], dict):
+                result["metrics"].update({
+                    "Function": func.__name__,
+                    "Latency (s)": round(latency, 3),
+                    "Memory Usage (MB)": round(mem_usage, 3)
+                })
             else:
-                # If result is not a dict, wrap it
-                result = {
-                    "result": result,
-                    "metrics": metrics
+                # Otherwise create a new metrics dict
+                result["metrics"] = {
+                    "Function": func.__name__,
+                    "Latency (s)": round(latency, 3),
+                    "Memory Usage (MB)": round(mem_usage, 3)
                 }
-            
-            return result
-        return wrapper
-    return decorator
-
-def generate_metrics_report(metrics_list: list) -> Optional[pd.DataFrame]:
-    """
-    Generate a DataFrame report from metrics data.
-    
-    Args:
-        metrics_list (list): List of metrics dictionaries
         
-    Returns:
-        pandas.DataFrame or None: Metrics report
-    """
-    if not metrics_list:
-        return None
+        return result
     
-    return pd.DataFrame(metrics_list)
+    return wrapper
 
-def log_metrics(metrics: Dict[str, Any], output_file: str = "metrics_log.csv") -> None:
-    """
-    Log metrics to a CSV file.
+class MetricsCollector:
+    """Collects and aggregates metrics from different operations."""
     
-    Args:
-        metrics (dict): Metrics dictionary
-        output_file (str): Path to output file
-    """
-    df = pd.DataFrame([metrics])
-    file_exists = os.path.isfile(output_file)
+    def __init__(self):
+        """Initialize an empty metrics collection."""
+        self.metrics = []
     
-    if file_exists:
-        df.to_csv(output_file, mode='a', header=False, index=False)
-    else:
-        df.to_csv(output_file, index=False)
+    def add_metrics(self, metrics_dict: Dict[str, Any], agent_name: Optional[str] = None) -> None:
+        """
+        Add metrics from an operation.
+        
+        Args:
+            metrics_dict: Dictionary of metrics
+            agent_name: Optional name of the agent that produced the metrics
+        """
+        metrics_entry = metrics_dict.copy()
+        if agent_name:
+            metrics_entry["Agent"] = agent_name
+        self.metrics.append(metrics_entry)
+    
+    def get_metrics_report(self) -> Dict[str, Any]:
+        """
+        Generate a summary report of collected metrics.
+        
+        Returns:
+            Dictionary with metrics summary
+        """
+        if not self.metrics:
+            return {"message": "No metrics collected"}
+        
+        # Calculate total latency
+        total_latency = sum(m.get("Latency (s)", 0) for m in self.metrics)
+        
+        # Calculate total token usage if available
+        total_prompt_tokens = sum(m.get("Prompt Tokens", 0) for m in self.metrics)
+        total_completion_tokens = sum(m.get("Completion Tokens", 0) for m in self.metrics)
+        total_tokens = sum(m.get("Total Tokens", 0) for m in self.metrics)
+        
+        # Create summary
+        summary = {
+            "Total Agents": len(self.metrics),
+            "Total Processing Time (s)": round(total_latency, 3),
+            "Total Prompt Tokens": total_prompt_tokens,
+            "Total Completion Tokens": total_completion_tokens,
+            "Total Tokens": total_tokens,
+            "Detailed Metrics": self.metrics
+        }
+        
+        return summary

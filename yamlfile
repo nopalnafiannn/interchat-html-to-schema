@@ -1,0 +1,35 @@
+schema:
+- column_name: Column
+  type: string
+  description: The name of the column
+- column_name: Type
+  type: string
+  description: The data type of the column
+- column_name: Size
+  type: number
+  description: The size of the column
+- column_name: Nulls
+  type: string
+  description: Indicates if the column allows null values
+- column_name: Auto
+  type: string
+  description: Indicates if the column has auto-increment enabled
+- column_name: Default
+  type: string
+  description: The default value of the column
+- column_name: Children
+  type: string
+  description: The child columns related to this column
+- column_name: Parents
+  type: string
+  description: The parent columns related to this column
+- column_name: Comments
+  type: string
+  description: Additional comments or notes about the column
+metadata:
+  table_caption: Assignfeedback Editpdf Annot Table Schema (assignfeedback_editpdf_annot)
+  column_count: 9
+  sample_rows_count: 5
+  has_sample_data: true
+  source_url: https://moodleschema.zoola.io/tables/assignfeedback_editpdf_annot.html
+  table_index: 0

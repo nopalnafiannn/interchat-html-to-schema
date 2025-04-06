@@ -1,103 +1,193 @@
-"""Kaggle integration utilities for the HTML to Data Schema Converter."""
+"""Kaggle integration for HTML to Data Schema Converter."""
 
 import os
 import json
-import shutil
 import glob
+import shutil
 import pandas as pd
+from typing import Dict, List, Any, Optional, Tuple
 
-def setup_kaggle_credentials():
-    """
-    Retrieves Kaggle credentials and writes the kaggle.json file.
+from html_schema_converter.config import config
+from html_schema_converter.agents.schema_generator import SchemaGenerator
+
+class KaggleIntegration:
+    """Handles integration with Kaggle datasets."""
     
-    Raises:
-        Exception: If Kaggle credentials are not found
-    """
-    # Try environment variables first
-    kaggle_username = os.environ.get("KAGGLE_USERNAME")
-    kaggle_key = os.environ.get("KAGGLE_SECRET_KEY")
+    def __init__(self):
+        """Initialize Kaggle integration with configuration."""
+        self.download_path = config.get("kaggle.download_path", "kaggle_data")
+        self.schema_generator = SchemaGenerator()
     
-    # Try Colab secrets if not found
-    if not kaggle_username or not kaggle_key:
+    def setup_kaggle_credentials(self) -> Dict[str, str]:
+        """
+        Set up Kaggle credentials from config or environment.
+        
+        Returns:
+            Dictionary with credential status
+        """
+        kaggle_credentials = config.get_kaggle_credentials()
+        
+        if not kaggle_credentials or 'username' not in kaggle_credentials or 'key' not in kaggle_credentials:
+            return {"status": "Error", "message": "Kaggle credentials not found in environment or config."}
+        
+        # Create Kaggle directory if it doesn't exist
+        kaggle_dir = os.path.join(os.path.expanduser("~"), ".kaggle")
+        if not os.path.exists(kaggle_dir):
+            os.makedirs(kaggle_dir, exist_ok=True)
+        
+        # Write kaggle.json
+        with open(os.path.join(kaggle_dir, "kaggle.json"), "w") as f:
+            json.dump(kaggle_credentials, f)
+        
+        # Set permissions
+        os.chmod(os.path.join(kaggle_dir, "kaggle.json"), 0o600)
+        
+        return {"status": "Success", "message": "Kaggle credentials configured."}
+    
+    def parse_dataset_id(self, url: str) -> str:
+        """
+        Parse dataset ID from Kaggle URL.
+        
+        Args:
+            url: Kaggle dataset URL
+            
+        Returns:
+            Dataset ID in format "username/dataset-name"
+        """
+        url = url.strip().rstrip("/")
+        parts = url.split('/')
+        
+        if len(parts) < 2:
+            raise ValueError("Invalid Kaggle dataset URL")
+            
+        dataset_id = parts[-2] + "/" + parts[-1]
+        return dataset_id
+    
+    def download_dataset(self, dataset_id: str) -> Dict[str, Any]:
+        """
+        Download a Kaggle dataset.
+        
+        Args:
+            dataset_id: Dataset ID in format "username/dataset-name"
+            
+        Returns:
+            Dictionary with download status
+        """
+        # Import Kaggle API
         try:
-            from google.colab import userdata
-            kaggle_username = userdata.get("KAGGLE_USERNAME")
-            kaggle_key = userdata.get("KAGGLE_SECRET_KEY")
-        except (ImportError, AttributeError):
-            pass
-    
-    if not kaggle_username or not kaggle_key:
-        raise Exception("Kaggle credentials not found in environment or Colab secrets.")
-    
-    # Create Kaggle directory and credentials file
-    kaggle_json = {"username": kaggle_username, "key": kaggle_key}
-    kaggle_dir = os.path.join(os.path.expanduser("~"), ".kaggle")
-    if not os.path.exists(kaggle_dir):
-        os.makedirs(kaggle_dir, exist_ok=True)
-    
-    with open(os.path.join(kaggle_dir, "kaggle.json"), "w") as f:
-        json.dump(kaggle_json, f)
-    
-    # Set permissions to 600
-    os.chmod(os.path.join(kaggle_dir, "kaggle.json"), 0o600)
-
-def generate_csv_schema(csv_file):
-    """
-    Generates a simple schema from a CSV file.
-    
-    Args:
-        csv_file (str): Path to CSV file
+            from kaggle.api.kaggle_api_extended import KaggleApi
+        except ImportError:
+            return {"status": "Error", "message": "Please install kaggle package: pip install kaggle"}
         
-    Returns:
-        dict: Schema dictionary
-    """
-    try:
-        df = pd.read_csv(csv_file, nrows=100)
-    except Exception as e:
-        print(f"Error reading CSV: {e}")
-        return {"schema": []}
-
-    schema = {"schema": []}
-    for col in df.columns:
-        dtype = str(df[col].dtype)
-        description = f"Column '{col}' with inferred type {dtype}"
-        schema["schema"].append({
-            "column_name": col,
-            "type": dtype,
-            "description": description
-        })
-    return schema
-
-def parse_dataset_id_from_url(url):
-    """
-    Parses Kaggle dataset ID from URL.
-    
-    Args:
-        url (str): Kaggle dataset URL
+        # Clear previous download directory
+        if os.path.exists(self.download_path):
+            shutil.rmtree(self.download_path)
+        os.makedirs(self.download_path, exist_ok=True)
         
-    Returns:
-        str: Dataset ID
-    """
-    url = url.strip().rstrip("/")
-    parts = url.split('/')
-    dataset_id = parts[-2] + "/" + parts[-1]
-    return dataset_id
-
-def format_csv_schema(schema, format_type="text"):
-    """
-    Formats a CSV schema in the desired format.
+        # Authenticate and download
+        try:
+            api = KaggleApi()
+            api.authenticate()
+            api.dataset_download_files(dataset_id, path=self.download_path, unzip=True)
+            return {"status": "Success", "message": "Dataset downloaded successfully."}
+        except Exception as e:
+            return {"status": "Error", "message": f"Failed to download dataset: {str(e)}"}
     
-    Args:
-        schema (dict): Schema dictionary
-        format_type (str): Output format (text, json, or yaml)
+    def list_csv_files(self) -> List[str]:
+        """
+        List CSV files in the download directory.
         
-    Returns:
-        str: Formatted schema
-    """
-    if format_type.lower() == "json":
-        return json.dumps(schema, indent=2)
-    elif format_type.lower() == "yaml":
-        import yaml
-        return yaml.dump(schema, sort_keys=False, default_flow_style=False)
-    else:
-        return json.dumps(schema)
+        Returns:
+            List of CSV file paths
+        """
+        return glob.glob(os.path.join(self.download_path, "*.csv"))
+    
+    def generate_csv_schema(self, csv_file: str) -> Dict[str, Any]:
+        """
+        Generate schema from a CSV file.
+        
+        Args:
+            csv_file: Path to CSV file
+            
+        Returns:
+            Dictionary with generated schema
+        """
+        try:
+            # Read sample of CSV file
+            df = pd.read_csv(csv_file, nrows=100)
+        except Exception as e:
+            return {"schema": None, "error": f"Error reading CSV: {str(e)}"}
+        
+        # Extract headers and sample data
+        headers = list(df.columns)
+        sample_data = df.head(5).values.tolist()
+        
+        # Create table_info dict in the same format used for HTML tables
+        table_info = {
+            "headers": headers,
+            "sample_data": sample_data
+        }
+        
+        # Generate schema
+        return self.schema_generator.generate_schema(table_info)
+    
+    def process_dataset(self, url: str) -> Dict[str, Any]:
+        """
+        Process a Kaggle dataset from URL to schema.
+        
+        Args:
+            url: Kaggle dataset URL
+            
+        Returns:
+            Dictionary with processing results
+        """
+        # Set up credentials
+        cred_result = self.setup_kaggle_credentials()
+        if cred_result["status"] != "Success":
+            return cred_result
+        
+        # Parse dataset ID
+        try:
+            dataset_id = self.parse_dataset_id(url)
+            print(f"Parsed Kaggle dataset id: {dataset_id}")
+        except ValueError as e:
+            return {"status": "Error", "message": str(e)}
+        
+        # Download dataset
+        download_result = self.download_dataset(dataset_id)
+        if download_result["status"] != "Success":
+            return download_result
+        
+        # List CSV files
+        csv_files = self.list_csv_files()
+        if not csv_files:
+            return {"status": "Error", "message": "No CSV files found in the downloaded dataset."}
+        
+        # Return list of available CSV files
+        return {
+            "status": "Success",
+            "message": "Dataset processed successfully.",
+            "csv_files": csv_files
+        }
+    
+    def interactive_csv_selection(self, csv_files: List[str]) -> Optional[str]:
+        """
+        Interactive selection of CSV file.
+        
+        Args:
+            csv_files: List of CSV file paths
+            
+        Returns:
+            Selected CSV file path or None if invalid selection
+        """
+        print("Available CSV files:")
+        for i, file in enumerate(csv_files):
+            print(f"{i+1}. {file}")
+            
+        choice = input(f"Choose a CSV file (1-{len(csv_files)}): ")
+        try:
+            selected_csv = csv_files[int(choice)-1]
+            return selected_csv
+        except (IndexError, ValueError):
+            print("Invalid selection.")
+            return None

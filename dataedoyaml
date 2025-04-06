@@ -1,0 +1,29 @@
+schema:
+- column_name: Key
+  type: string
+  description: A short description of the column
+- column_name: Name
+  type: string
+  description: Country or region name.
+- column_name: Data type
+  type: string
+  description: A short description of the column
+- column_name: 'Null'
+  type: string
+  description: A short description of the column
+- column_name: Attributes
+  type: string
+  description: A short description of the column
+- column_name: References
+  type: string
+  description: A short description of the column
+- column_name: Description
+  type: string
+  description: ISO standard code for countries and regions.
+metadata:
+  table_caption: Person.CountryRegion
+  column_count: 9
+  sample_rows_count: 5
+  has_sample_data: true
+  source_url: https://dataedo.com/samples/html/AdventureWorks/doc/AdventureWorks_2/tables/Person_CountryRegion_141.html
+  table_index: 1

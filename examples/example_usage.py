@@ -1,68 +1,63 @@
 """Example usage of the HTML to Data Schema Converter."""
 
-from html_schema_converter.agents.html_reader import html_reader_agent
-from html_schema_converter.agents.table_analyzer import analyze_tables_with_llm
-from html_schema_converter.agents.schema_generator import generate_datascheme_with_llm
-from html_schema_converter.utils.formatters import format_schema
-from html_schema_converter.llm.openai_client import OpenAIClient
+from html_schema_converter import SchemaConverter
 
-def run_example():
-    """Run an example of the HTML to Data Schema Converter."""
-    print("HTML to Data Schema Converter Example")
-    print("====================================")
+def example_url_conversion():
+    """Example of converting HTML from a URL."""
+    # URL with a data table (this is just an example URL)
+    url = "https://en.wikipedia.org/wiki/List_of_countries_by_GDP_(nominal)"
     
-    # Initialize OpenAI client
-    try:
-        llm_client = OpenAIClient()
-    except ValueError as e:
-        print(f"Error: {e}")
-        print("Please set your OpenAI API key as an environment variable: OPENAI_API_KEY")
-        return
+    # Initialize the converter
+    converter = SchemaConverter()
     
-    # URL to process (example Wikipedia page with tables)
-    url = "https://en.wikipedia.org/wiki/List_of_programming_languages"
-    print(f"Extracting tables from {url}")
+    print(f"Converting tables from URL: {url}")
+    print("This will use LLM to analyze tables and generate schema.")
+    print("Follow the interactive prompts to select a table...")
     
-    # Extract tables
-    tables_info = html_reader_agent(url)
+    # Generate schema from URL
+    schema = converter.from_url(url)
     
-    if tables_info["status"] != "Success":
-        print(f"Error: {tables_info['status']}")
-        return
+    # Save in different formats
+    converter.save_schema(schema, "example_schema.json", "json")
+    converter.save_schema(schema, "example_schema.yaml", "yaml")
     
-    print(f"Found {tables_info['tables_count']} tables")
+    # Print metrics
+    converter.print_metrics_report()
     
-    # Analyze tables to find the main one
-    print("Analyzing tables to find the main content table...")
-    llm_analysis = analyze_tables_with_llm(tables_info, llm_client)
+    # Print schema details
+    print(f"\nGenerated schema has {len(schema)} columns:")
+    for col in schema.schema:
+        print(f"  - {col.column_name} ({col.type}): {col.description}")
+
+def example_kaggle_conversion():
+    """Example of converting a CSV from a Kaggle dataset."""
+    # Kaggle dataset URL (this is just an example URL)
+    kaggle_url = "https://www.kaggle.com/datasets/kaggle/us-baby-names"
     
-    # For demonstration, just use the first table
-    print("For this example, we'll use the first table:")
-    selected_table = tables_info["tables"][0]
-    print(f"  Columns: {selected_table['column_count']}")
-    print(f"  Headers: {', '.join(selected_table['headers'][:5])}...")
+    # Initialize the converter
+    converter = SchemaConverter()
     
-    # Generate schema
-    print("\nGenerating schema...")
-    schema = generate_datascheme_with_llm(selected_table, llm_client)
+    print(f"Converting Kaggle dataset: {kaggle_url}")
+    print("This requires valid Kaggle credentials to be configured.")
+    print("Follow the interactive prompts to select a CSV file...")
     
-    # Format and display output
-    json_output = format_schema(schema, "json")
-    print("\nGenerated Schema (JSON):")
-    print(json_output)
+    # Generate schema from Kaggle dataset
+    schema = converter.from_kaggle(kaggle_url)
     
-    # Save output
-    output_file = "example_schema.json"
-    with open(output_file, "w") as f:
-        f.write(json_output)
+    # Save schema
+    converter.save_schema(schema, "kaggle_example_schema.json")
     
-    print(f"\nSchema saved to {output_file}")
+    # Print metrics
+    converter.print_metrics_report()
+
+def main():
+    """Run the examples."""
+    print("HTML to Data Schema Converter - Example Usage")
+    print("=" * 50)
     
-    # Display metrics
-    if "metrics" in schema:
-        print("\nPerformance Metrics:")
-        for key, value in schema["metrics"].items():
-            print(f"  {key}: {value}")
+    # Uncomment the example you want to run
+    example_url_conversion()
+    # example_kaggle_conversion()
 
 if __name__ == "__main__":
-    run_example()
+    main()

@@ -1,1 +1,1 @@
-"""Tests for the HTML to Data Schema Converter."""
+"""Test package for HTML to Data Schema Converter."""

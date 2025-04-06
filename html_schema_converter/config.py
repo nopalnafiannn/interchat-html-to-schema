@@ -1,90 +1,106 @@
-"""Configuration management for the HTML to Data Schema Converter."""
+"""Configuration management for HTML to Data Schema Converter."""
 
 import os
 import yaml
 from typing import Dict, Any, Optional
 
-# Default configuration file path
-DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config.yaml')
-
 class Config:
-    """Configuration manager for the application."""
-    
+    """Manages configuration for the HTML to Data Schema Converter."""
+
+    DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config.yaml")
+
     def __init__(self, config_path: Optional[str] = None):
         """
-        Initialize the configuration.
-        
+        Initialize configuration with a custom path or the default path.
+
         Args:
-            config_path (str, optional): Path to the configuration file. 
-                                         If None, uses the default path.
+            config_path: Optional path to configuration file
         """
-        self.config_path = config_path or DEFAULT_CONFIG_PATH
+        self.config_path = config_path or self.DEFAULT_CONFIG_PATH
         self.config = self._load_config()
-    
+
     def _load_config(self) -> Dict[str, Any]:
         """
-        Load the configuration from the YAML file.
-        
+        Load configuration from YAML file.
+
         Returns:
-            dict: Configuration dictionary
+            Dict with configuration values
         """
-        try:
-            with open(self.config_path, 'r') as f:
+        if os.path.exists(self.config_path):
+            with open(self.config_path, "r") as f:
                 return yaml.safe_load(f)
-        except FileNotFoundError:
-            print(f"Warning: Config file {self.config_path} not found. Using default settings.")
-            return self._default_config()
-    
-    def _default_config(self) -> Dict[str, Any]:
+        return {}
+
+    def get(self, key: str, default: Any = None) -> Any:
         """
-        Provide default configuration if the config file is not found.
-        
-        Returns:
-            dict: Default configuration dictionary
-        """
-        return {
-            "openai": {
-                "default_model": "gpt-3.5-turbo",
-                "schema_model": "gpt-3.5-turbo-16k",
-                "max_tokens": 1000,
-                "temperature": 0
-            },
-            "html": {
-                "max_file_size_mb": 10,
-                "max_sample_rows": 5
-            },
-            "schema": {
-                "output_formats": ["text", "json", "yaml"],
-                "default_format": "json"
-            },
-            "kaggle": {
-                "download_path": "kaggle_data"
-            },
-            "metrics": {
-                "track_latency": True,
-                "track_memory": True,
-                "track_tokens": True
-            }
-        }
-    
-    def get(self, section: str, key: Optional[str] = None) -> Any:
-        """
-        Get a configuration value.
-        
+        Get a configuration value by key.
+
         Args:
-            section (str): Configuration section
-            key (str, optional): Configuration key. If None, returns the entire section.
-            
+            key: Configuration key (can use dot notation for nested keys)
+            default: Default value if key not found
+
         Returns:
-            any: Configuration value
+            Configuration value
         """
-        if section not in self.config:
-            raise KeyError(f"Configuration section '{section}' not found")
+        keys = key.split(".")
+        value = self.config
         
-        if key is None:
-            return self.config[section]
+        try:
+            for k in keys:
+                value = value[k]
+            return value
+        except (KeyError, TypeError):
+            return default
+
+    def get_env(self, key: str, env_var: str, default: Any = None) -> Any:
+        """
+        Get a configuration value with environment variable fallback.
+
+        Args:
+            key: Configuration key
+            env_var: Environment variable name
+            default: Default value if neither config nor env var exists
+
+        Returns:
+            Configuration value
+        """
+        # Try environment variable first
+        env_value = os.environ.get(env_var)
+        if env_value is not None:
+            return env_value
+            
+        # Then try config file
+        config_value = self.get(key)
+        if config_value is not None:
+            return config_value
+            
+        # Fall back to default
+        return default
+
+    def get_openai_api_key(self) -> Optional[str]:
+        """
+        Get OpenAI API key from environment or config.
+
+        Returns:
+            OpenAI API key if found, None otherwise
+        """
+        # Try different sources, prioritizing environment
+        return (os.environ.get("OPENAI_API_KEY") or 
+                self.get("llm.api_key"))
+
+    def get_kaggle_credentials(self) -> Dict[str, str]:
+        """
+        Get Kaggle credentials from environment or config.
+
+        Returns:
+            Dict with username and key if found, empty dict otherwise
+        """
+        username = os.environ.get("KAGGLE_USERNAME") or self.get("kaggle.username")
+        key = os.environ.get("KAGGLE_SECRET_KEY") or self.get("kaggle.key")
         
-        if key not in self.config[section]:
-            raise KeyError(f"Configuration key '{key}' not found in section '{section}'")
-        
-        return self.config[section][key]
+        if username and key:
+            return {"username": username, "key": key}
+        return {}
+
+# Global config instance
+config = Config()

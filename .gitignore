@@ -1,10 +1,9 @@
-echo "# Python
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
-env/
 build/
 develop-eggs/
 dist/
@@ -16,24 +15,34 @@ lib64/
 parts/
 sdist/
 var/
+wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+MANIFEST
 
-# Environment variables
-.env
-
-# Output files
-generated_schema.*
-generated_csv_schema.*
-kaggle_data/
-
-# Virtual Environment
+# Virtual environments
 venv/
-.venv/
+env/
+ENV/
 
-# IDE
+# IDE specific files
 .idea/
 .vscode/
 *.swp
-*.swo" > .gitignore
+*.swo
+
+# Project specific
+generated_schema.*
+generated_csv_schema.*
+kaggle_data/
+.kaggle/
+.env
+.envrc
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Logs
+logs/
+*.log

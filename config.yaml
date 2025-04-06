@@ -1,29 +1,34 @@
-# OpenAI API settings
-openai:
-  default_model: "gpt-3.5-turbo"
-  schema_model: "gpt-3.5-turbo-16k"
-  max_tokens: 1000
+# HTML to Data Schema Converter Configuration
+
+# LLM Settings
+llm:
+  provider: openai
+  table_analysis_model: gpt-3.5-turbo
+  schema_generation_model: gpt-3.5-turbo-16k
   temperature: 0
 
-# HTML parsing settings
-html:
+# HTML Reader Settings
+html_reader:
   max_file_size_mb: 10
-  max_sample_rows: 5
-  
-# Schema settings
-schema:
+  sample_rows: 5
+  table_detection:
+    search_div_classes: true
+    detect_implicit_tables: true
+
+# Schema Generation
+schema_generation:
+  max_tokens: 2000
   output_formats:
     - text
     - json
     - yaml
-  default_format: "json"
-  
-# Kaggle settings
+
+# Kaggle Integration
 kaggle:
+  enabled: true
   download_path: "kaggle_data"
-  
-# Metrics settings
-metrics:
-  track_latency: true
-  track_memory: true
-  track_tokens: true
+
+# Output Settings
+output:
+  default_format: text
+  save_metrics: true
