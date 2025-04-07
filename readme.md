@@ -1,16 +1,13 @@
-# HTML to Data Schema Converter
+## The interchat HTML project for course AI for PM
 
-A specialized tool that automatically extracts and generates structured data schemas from HTML tables for use with InterChat.
+This project automates the generation of InterChat-compatible data schemas from HTML tables and URLs using a multi-agent system built on the OpenAI Agent SDK.  It extracts table structures with BeautifulSoup and employs LLM-driven prompt chaining to generate column names, types, and descriptions. The system supports iterative feedback, outputs JSON/YAML formats, and dramatically reduces schema preparation time.
 
-## Overview
-
-The HTML to Data Schema Converter eliminates a critical barrier to entry for InterChat users by automating the creation of data schemas. InterChat is a powerful generative visual analytics system that requires structured data schemas to function effectively, and this tool bridges the gap by converting HTML tables into these schemas.
+InterChat is a powerful generative visual analytics system that requires structured data schemas to function effectively, and this tool bridges the gap by converting HTML tables into these schemas.
 
 ## Features
 
 - Extract tables from HTML files or web pages
 - Process datasets from Kaggle
-- Use LLM to intelligently identify main tables in multi-table documents
 - Generate high-quality data schemas with accurate data types and descriptions
 - Support for both table formats:
   - Tables with both column names and sample data
@@ -19,7 +16,42 @@ The HTML to Data Schema Converter eliminates a critical barrier to entry for Int
 - Interactive user feedback for schema refinement
 - Performance metrics tracking
 
-## Installation
+# Workflow
+
+**1. HTML Table Extraction & Cleaning (Python-based)**
+Input: User uploads an HTML file or provides a URL.
+The system - Parses all table elements, Cleans data (remove null/NaN, standardize formats), Validate if the HTML contains any usable tables and Present a UI for table selection if multiple are found. 
+
+**Tools:** Table parsing/cleaning	Python (BeautifulSoup, pandas)
+
+**2. Metadata Generation (LLM Agent)**
+Once a table is selected and cleaned, it’s passed to a Metadata Generation Agent using the OpenAI Agent SDK.
+This agent analyzes the data to generate: Cleaned/formatted column names, Data types (e.g., string, integer, float, date) and Semantic column descriptions
+
+Notes any low-confidence areas or potential discrepancies
+
+**Tools:** Metadata generation	OpenAI LLM Agent
+
+**3. Feedback & Refinement (LLM Agent)**
+A second Refinement Agent (LLM) takes user input to iteratively improve the schema:
+Users can suggest edits in plain language (“make date a string”, “add unit to salary”)
+The agent applies changes and regenerates the schema metadata
+
+**Tools:** MHuman feedback/refinement	OpenAI LLM Agent
+
+**4. Schema Assembly (Python-based)**
+Final metadata is passed to a Python module that Formats it into InterChat-compatible JSON and YAML schemas and Validates structure against InterChat's required schema
+
+**Tools:** Schema assembly	Python (json, yaml)
+
+**5. Output & Metrics Logging (Python-based)**
+Output: JSON and YAML schema files available for download or upload to InterChat
+
+**Metrics Logged:** Latency, Token usage (for each LLM agent call), Estimated API cost per run
+
+
+
+## How to install this project. 
 
 ```bash
 # Clone the repository
@@ -87,3 +119,21 @@ flake8
 ## License
 
 MIT License
+
+
+# How to tweak this project for your own use.
+# Found a bug?
+# Known issues (work in progress)
+
+# Like this project?
+Contact for more info - linkedin etc
+
+
+
+
+
+
+
+
+
+
