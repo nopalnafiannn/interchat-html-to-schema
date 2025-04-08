@@ -1,1 +1,26 @@
+##Structural Edge Cases
+
+1. Wide Tables (Many Columns)                               https://archive.ics.uci.edu/dataset/20/census+income , https://data.cityofnewyork.us/Environment/2018-Central-Park-Squirrel-Census-Squirrel-Data/vfnx-vebw/about_data
+Tests LLM token limits and schema generation latency
+
+2. Very Long Tables (Many Rows)                             https://www.kaggle.com/datasets/new-york-city/nyc-property-sales
+Tests processing efficiency and memory management
+
+3. Multi-Level Headers
+Tests header interpretation accuracy                        https://datatopics.worldbank.org/world-development-indicators/themes/economy.html
+
+4. Uncommon Column Headers
+Tests schema generation with domain-specific terms          https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE2034
+
+5. Similar but Distinct Columns                             https://www.kaggle.com/datasets/seanlahman/the-history-of-baseball
+Tests differentiation between similar columns
+
+6. Values That Look Like Different Types                    https://simplemaps.com/data/us-zips
+
+7. Date/Time Format Variations in First Rows
+ Different date formats by country                          https://www.kaggle.com/datasets/hugomathien/soccer
+
+8. Columns That Change Meaning Within Table                https://www.kaggle.com/datasets/rounakbanik/the-movies-dataset
+
+9. Multi-level headers ---                                 https://www.w3.org/WAI/tutorials/tables/multi-level/, https://www.w3.org/WAI/tutorials/tables/irregular/
 
