@@ -14,7 +14,7 @@ This converter uses a multi-agent architecture powered by BeautifulSoup for HTML
 
 In milestone 3, we have refined our approach with an enhanced workflow that better handles multiple input sources and processing paths:
 
-![HTML to Data Schema Converter Workflow](images/flow-diagram.jpg)
+![HTML to Data Schema Converter Workflow](images/images_workflow.jpg)
 
 ### Key Workflow Improvements
 
