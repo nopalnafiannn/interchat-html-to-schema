@@ -9,19 +9,27 @@ import yaml
 class SchemaColumn:
     """Represents a column in the data schema."""
     
-    column_name: str
+    name: str  # Changed from column_name to name for consistency
     type: str
     description: str
+    nullable: bool = True
     confidence: float = 1.0
     sample_values: List[Any] = field(default_factory=list)
     inferred: bool = False
     
+    def __post_init__(self):
+        """Initialize attributes after creation."""
+        # For backwards compatibility
+        if not hasattr(self, 'name') and hasattr(self, 'column_name'):
+            self.name = self.column_name
+    
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary, excluding internal fields."""
         result = {
-            "column_name": self.column_name,
+            "name": self.name,
             "type": self.type,
-            "description": self.description
+            "description": self.description,
+            "nullable": self.nullable
         }
         # Only include confidence and inferred if they're non-default
         if self.confidence < 1.0:
@@ -34,10 +42,18 @@ class SchemaColumn:
 class Schema:
     """Represents a complete data schema extracted from a table."""
     
-    schema: List[SchemaColumn] = field(default_factory=list)
+    name: str = "Table Schema"
+    description: str = ""
+    columns: List[SchemaColumn] = field(default_factory=list)
     metadata: Dict[str, Any] = field(default_factory=dict)
     metrics: Dict[str, Any] = field(default_factory=dict)
     
+    def __post_init__(self):
+        """Initialize attributes after creation."""
+        # For backwards compatibility
+        if not hasattr(self, 'columns') and hasattr(self, 'schema'):
+            self.columns = self.schema
+            
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'Schema':
         """
@@ -49,26 +65,39 @@ class Schema:
         Returns:
             Schema instance
         """
-        if "schema" not in data:
-            raise ValueError("Invalid schema format: 'schema' key missing")
+        # Handle both formats for backwards compatibility
+        columns_data = data.get("columns", data.get("schema", []))
+        if not columns_data:
+            raise ValueError("Invalid schema format: neither 'columns' nor 'schema' key found")
             
         columns = []
-        for col_data in data["schema"]:
-            if "column_name" not in col_data or "type" not in col_data:
+        for col_data in columns_data:
+            # Check for both naming conventions
+            col_name = col_data.get("name", col_data.get("column_name", ""))
+            if not col_name or "type" not in col_data:
                 raise ValueError(f"Invalid column format: {col_data}")
                 
             columns.append(SchemaColumn(
-                column_name=col_data["column_name"],
+                name=col_name,
                 type=col_data["type"],
                 description=col_data.get("description", ""),
+                nullable=col_data.get("nullable", True),
                 confidence=col_data.get("confidence", 1.0),
                 inferred=col_data.get("inferred", False)
             ))
             
+        name = data.get("name", "Table Schema")
+        description = data.get("description", "")
         metadata = data.get("metadata", {})
         metrics = data.get("metrics", {})
         
-        return cls(schema=columns, metadata=metadata, metrics=metrics)
+        return cls(
+            name=name,
+            description=description,
+            columns=columns,
+            metadata=metadata,
+            metrics=metrics
+        )
     
     @classmethod
     def from_json(cls, json_str: str) -> 'Schema':
@@ -95,7 +124,9 @@ class Schema:
             Dictionary representation of the schema
         """
         result = {
-            "schema": [col.to_dict() for col in self.schema]
+            "name": self.name,
+            "description": self.description,
+            "columns": [col.to_dict() for col in self.columns]
         }
         if self.metadata:
             result["metadata"] = self.metadata
@@ -142,4 +173,4 @@ class Schema:
     
     def __len__(self) -> int:
         """Return the number of columns in the schema."""
-        return len(self.schema)
+        return len(self.columns)

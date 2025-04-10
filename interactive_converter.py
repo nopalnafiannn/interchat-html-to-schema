@@ -4,6 +4,8 @@ import os
 from dotenv import load_dotenv
 from html_schema_converter.main import SchemaConverter
 from html_schema_converter.config import config
+from html_schema_converter.agents.schema_refiner import refine_schema
+from html_schema_converter.utils.formatters import SchemaFormatter
 
 def load_api_key():
     """Load OpenAI API key from .env or prompt user."""
@@ -23,6 +25,82 @@ def load_api_key():
             sys.exit(1)
     
     return api_key
+
+def get_human_feedback(schema_text, output_format):
+    """
+    Request human feedback on the generated schema.
+    
+    Args:
+        schema_text: The generated schema text to review
+        output_format: The format of the schema (json, yaml, text)
+    
+    Returns:
+        String with human feedback or None if satisfied
+    """
+    print("\n" + "=" * 50)
+    print("Generated Schema Review")
+    print("=" * 50)
+    print(f"\n{schema_text}\n")
+    
+    print("Is this schema correct and suitable for your needs?")
+    satisfaction = input("Enter 'y' if satisfied, or 'n' to provide feedback: ").strip().lower()
+    
+    if satisfaction == 'y':
+        return None
+    
+    print("\nPlease provide your feedback on how to improve the schema.")
+    print("Examples: 'Column X should be numeric instead of string', 'Add description for column Y', etc.")
+    feedback = input("\nYour feedback: ").strip()
+    
+    return feedback
+
+def feedback_loop(converter, original_schema, output_format):
+    """
+    Implement a feedback loop for refining the schema.
+    
+    Args:
+        converter: SchemaConverter instance
+        original_schema: Original Schema object
+        output_format: Output format (json, yaml, text)
+    
+    Returns:
+        Final refined schema
+    """
+    formatter = SchemaFormatter()
+    current_schema = original_schema
+    iteration = 1
+    
+    while True:
+        # Format the current schema to show the user
+        schema_text = formatter.format_schema(current_schema, output_format)
+        
+        # Get human feedback
+        feedback = get_human_feedback(schema_text, output_format)
+        
+        # If user is satisfied, break the loop
+        if not feedback:
+            print("\nGreat! You are satisfied with the schema.")
+            break
+        
+        print(f"\nRefining schema based on feedback (Iteration {iteration})...")
+        
+        # Convert schema to string format for refining
+        schema_str = formatter.format_schema(current_schema, "json" if output_format == "text" else output_format)
+        
+        # Refine the schema using the schema_refiner
+        refined_schema_str = refine_schema(schema_str, feedback)
+        
+        # Parse the refined schema back into a Schema object
+        refined_schema = formatter.parse_schema_from_string(refined_schema_str, output_format)
+        
+        # Preserve the original metadata
+        refined_schema.metadata = current_schema.metadata
+        
+        # Update current schema for next iteration
+        current_schema = refined_schema
+        iteration += 1
+    
+    return current_schema
 
 def interactive_main():
     """Interactive version of the CLI that prompts for input."""
@@ -79,17 +157,20 @@ def interactive_main():
             output_format = "json"
             output_file = "generated_schema.json"
         
+        # Run the feedback loop to refine the schema
+        refined_schema = feedback_loop(converter, schema, output_format)
+        
         # Ask if they want to change the output filename
         custom_filename = input(f"\nDefault output file: {output_file}\nPress Enter to use this or type a new filename: ").strip()
         
         if custom_filename:
             output_file = custom_filename
         
-        # Save the schema
-        converter.save_schema(schema, output_file, output_format)
+        # Save the refined schema
+        converter.save_schema(refined_schema, output_file, output_format)
         converter.print_metrics_report()
         
-        print(f"\nComplete! Schema saved to {output_file}")
+        print(f"\nComplete! Refined schema saved to {output_file}")
         
     except Exception as e:
         print(f"\nError: {str(e)}")

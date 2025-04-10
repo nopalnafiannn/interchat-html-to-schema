@@ -2,9 +2,9 @@
 
 import json
 import yaml
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List, Union
 
-from html_schema_converter.models.schema import Schema
+from html_schema_converter.models.schema import Schema, SchemaColumn
 
 class SchemaFormatter:
     """Handles formatting of schemas into different output formats."""
@@ -22,7 +22,7 @@ class SchemaFormatter:
             Formatted string representation of the schema
         """
         if not isinstance(schema, Schema):
-            raise TypeError("Expected Schema object, got {type(schema)}")
+            raise TypeError(f"Expected Schema object, got {type(schema)}")
         
         format_type = format_type.lower()
         
@@ -84,3 +84,52 @@ class SchemaFormatter:
             f.write(formatted_schema)
         
         print(f"Schema saved to {output_path}")
+    
+    @staticmethod
+    def parse_schema_from_string(schema_string: str, format_type: str = "json") -> Schema:
+        """
+        Parse a schema from a string representation.
+        
+        Args:
+            schema_string: String representation of the schema
+            format_type: Format of the schema string (json or yaml)
+            
+        Returns:
+            Parsed Schema object
+        """
+        format_type = format_type.lower()
+        
+        try:
+            # Parse the string to a dictionary based on format
+            if format_type in ["json", "text"]:
+                schema_dict = json.loads(schema_string)
+            elif format_type == "yaml":
+                schema_dict = yaml.safe_load(schema_string)
+            else:
+                raise ValueError(f"Unsupported format type: {format_type}")
+            
+            # Extract schema components
+            columns_data = schema_dict.get("columns", [])
+            metadata = schema_dict.get("metadata", {})
+            name = schema_dict.get("name", "Unknown")
+            description = schema_dict.get("description", "")
+            
+            # Create SchemaColumn objects
+            columns = []
+            for col_data in columns_data:
+                col = SchemaColumn(
+                    name=col_data.get("name", ""),
+                    type=col_data.get("type", "string"),
+                    description=col_data.get("description", ""),
+                    nullable=col_data.get("nullable", True),
+                    confidence=col_data.get("confidence", 1.0)
+                )
+                columns.append(col)
+            
+            # Create and return the Schema object
+            return Schema(name=name, description=description, columns=columns, metadata=metadata)
+            
+        except (json.JSONDecodeError, yaml.YAMLError) as e:
+            raise ValueError(f"Failed to parse schema string: {str(e)}")
+        except KeyError as e:
+            raise ValueError(f"Missing required key in schema: {str(e)}")

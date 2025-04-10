@@ -5,6 +5,7 @@ llm:
   provider: openai
   table_analysis_model: gpt-3.5-turbo
   schema_generation_model: gpt-3.5-turbo-16k
+  schema_refinement_model: gpt-3.5-turbo-16k
   temperature: 0
 
 # HTML Reader Settings
@@ -22,6 +23,11 @@ schema_generation:
     - text
     - json
     - yaml
+
+# Schema Refinement
+schema_refinement:
+  max_tokens: 2000
+  enable_feedback: true
 
 # Kaggle Integration
 kaggle:

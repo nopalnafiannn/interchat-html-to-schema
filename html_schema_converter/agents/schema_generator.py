@@ -125,19 +125,24 @@ Here are some sample rows:
 Generate valid JSON describing each column in the format:
 
 {{
-  "schema": [
+  "name": "Table Schema",
+  "description": "A brief description of the overall table",
+  "columns": [
     {{
-      "column_name": "ColumnName",
+      "name": "ColumnName",
       "type": "string/number/date/boolean/unknown",
-      "description": "A short description of the column"
+      "description": "A short description of the column",
+      "nullable": true
     }},
     ...
   ]
 }}
 
-- Use the header text as "column_name".
+- Use the header text as "name".
 - Infer "type" from sample data precisely.
 - Provide a short "description" for each column.
+- Include a nullable property (true/false) for each column.
+- Also add a table-level name and description.
 - Output only valid JSON. Do not include extra text.
 """
         return prompt
@@ -161,11 +166,14 @@ There is no sample data available, so you need to infer the column types and des
 Generate valid JSON describing each column in the format:
 
 {{
-  "schema": [
+  "name": "Table Schema",
+  "description": "A brief description of the overall table",
+  "columns": [
     {{
-      "column_name": "ColumnName",
+      "name": "ColumnName",
       "type": "string/number/date/boolean/unknown",
       "description": "A short description of the column",
+      "nullable": true,
       "inferred": true,
       "confidence": 0.7
     }},
@@ -173,11 +181,13 @@ Generate valid JSON describing each column in the format:
   ]
 }}
 
-- Use the header text as "column_name".
+- Use the header text as "name".
 - Infer "type" based on common naming conventions.
 - Add a "confidence" score between 0.0 and 1.0 to indicate your confidence in the type inference.
 - Include "inferred": true for all columns to indicate this is based only on column names.
 - Provide a short "description" for each column.
+- Include a nullable property (true/false) for each column.
+- Also add a table-level name and description.
 - Output only valid JSON. Do not include extra text.
 """
         return prompt
@@ -212,24 +222,36 @@ Generate valid JSON describing each column in the format:
         Returns:
             Schema object
         """
-        if "schema" not in schema_data:
-            raise ValueError("Invalid schema format: 'schema' key missing")
+        # Handle both the old and new schema formats
+        columns_data = schema_data.get("columns", schema_data.get("schema", []))
+        if not columns_data:
+            raise ValueError("Invalid schema format: neither 'columns' nor 'schema' key found")
             
         columns = []
-        for col_data in schema_data["schema"]:
-            if "column_name" not in col_data or "type" not in col_data:
+        for col_data in columns_data:
+            # Handle both naming conventions
+            col_name = col_data.get("name", col_data.get("column_name", ""))
+            if not col_name or "type" not in col_data:
                 raise ValueError(f"Invalid column format: {col_data}")
                 
             column = SchemaColumn(
-                column_name=col_data["column_name"],
+                name=col_name,
                 type=col_data["type"],
                 description=col_data.get("description", ""),
+                nullable=col_data.get("nullable", True),
                 confidence=col_data.get("confidence", 1.0),
                 inferred=col_data.get("inferred", not has_sample_data)
             )
             columns.append(column)
-            
-        return Schema(schema=columns)
+        
+        name = schema_data.get("name", "Table Schema")
+        description = schema_data.get("description", "")
+        
+        return Schema(
+            name=name,
+            description=description,
+            columns=columns
+        )
     
     @track_metrics
     def incorporate_feedback(self, original_schema: Schema, feedback: Dict[str, Any]) -> Dict[str, Any]:
