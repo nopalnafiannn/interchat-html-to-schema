@@ -34,8 +34,10 @@ Our refined architecture now features:
      - Schema Generator 2: Works with limited data (column names only)
 
 4. **Feedback Processing System**
-   - Added user feedback integration (marked as "Not Developed Yet" in current iteration)
-   - Framework for human-in-the-loop refinement
+   - New schema refiner agent that incorporates human feedback
+   - Enhanced type inference with precise Python types
+   - Separate performance metrics tracking for feedback iterations
+   - Human-in-the-loop refinement with data validation constraints
 
 ## Features
 
@@ -50,7 +52,9 @@ Our refined architecture now features:
   - Support for both standard HTML tables and div-based tables
 
 - **Smart Schema Generation**
-  - Data type inference from table contents
+  - Precise data type inference from table contents (int, float, str, list, bool, etc.)
+  - Format specifications for special data types (dates, currencies, etc.)
+  - Constraints detection for data validation (min/max values, regex patterns)
   - Meaningful column descriptions using LLM
   - Confidence scores for inferred types
   - Handling both complete data (headers + values) and partial data (headers only)
@@ -117,15 +121,30 @@ Set up your API keys using any of these methods:
 
 ## Usage
 
-### Interactive Mode (Recommended)
+### Streamlit UI (Recommended)
 
-The interactive mode guides you through the process step by step:
+The Streamlit UI provides a modern, user-friendly interface:
+
+```bash
+streamlit run streamlit_app.py
+```
+
+The Streamlit interface offers:
+1. A step-by-step workflow with clear navigation
+2. Input selection (URL, file upload, or Kaggle dataset)
+3. Visual table previews for easier selection
+4. Interactive schema review with feedback options
+5. Multiple output formats and downloadable results
+
+### Command-line Interactive Mode
+
+The terminal-based interactive mode is also available:
 
 ```bash
 python interactive_converter.py
 ```
 
-The interactive interface will:
+This interface will:
 1. Guide you through input selection (URL, file, or Kaggle dataset)
 2. Load and analyze tables
 3. Help you select the most relevant table
@@ -151,6 +170,9 @@ python -m html_schema_converter.main --url https://example.com/page-with-table.h
 
 # Specify output file
 python -m html_schema_converter.main --url https://example.com/page-with-table.html --output my_schema.json
+
+# Add human feedback to refine schema types and constraints
+python -m html_schema_converter.main --url https://example.com/page-with-table.html --feedback "The Date column should be datetime format YYYY-MM-DD and the Price column should be a positive float with 2 decimal places."
 ```
 
 ## System Architecture
@@ -173,12 +195,20 @@ The system uses a multi-agent architecture with specialized components:
    - Two pathways based on data completeness:
      - Schema Generator 1: Uses both column names AND sample data
      - Schema Generator 2: Uses ONLY column names with confidence scores
-   - Generates structured schema with column types and descriptions
+   - Generates structured schema with precise Python data types
+   - Adds format specifications and validation constraints
+   - Produces detailed schema with type information
 
-4. **Output Formatting**
+4. **Schema Refiner Agent**
+   - Processes human feedback to improve schemas
+   - Enhances type precision based on user input
+   - Maintains separate performance metrics for feedback iterations
+   - Preserves schema structure while refining types
+
+5. **Output Formatting**
    - Converts Schema objects to JSON/YAML/Text
    - Customizable output filenames
-   - Performance metrics reporting
+   - Detailed performance metrics reporting for both initial generation and feedback
 
 ### Data Flow
 
@@ -191,12 +221,24 @@ The system uses a multi-agent architecture with specialized components:
 
 ## Performance Metrics
 
-The system tracks several key metrics for each run:
+The system tracks several key metrics for each run, now with separate tracking for initial generation and human feedback iterations:
 
-- **Processing Latency**: Time from input to schema generation
-- **Memory Usage**: Memory consumed during processing
-- **LLM Token Usage**: Prompt and completion tokens for each LLM call
-- **Total Processing Cost**: Estimated API cost (based on token usage)
+- **Initial Generation Metrics**:
+  - Processing Latency: Time for initial schema generation
+  - Memory Usage: Memory consumed during initial processing
+  - LLM Token Usage: Prompt and completion tokens for initial generation
+  - Average Processing Time: Average time per operation
+
+- **Feedback Iteration Metrics**:
+  - Processing Latency: Time for processing human feedback
+  - Memory Usage: Memory consumed during refinement
+  - LLM Token Usage: Prompt and completion tokens for refinement
+  - Average Processing Time: Average time per feedback iteration
+
+- **Combined Metrics**:
+  - Total Processing Latency: Total time across all operations
+  - Total LLM Token Usage: Combined tokens for all LLM interactions
+  - Total Estimated Cost: Based on token usage across both phases
 
 ## Current Implementation Status
 
@@ -209,7 +251,7 @@ The current implementation includes:
 - ✅ Performance metrics
 - ✅ Multiple output formats
 
-**Note**: The human feedback loop for schema refinement (Schema Generator 3) described in the PRD is not yet implemented in the current version.
+✅ Schema Refinement with human feedback is now fully implemented. The system can accept human feedback to further refine data types and add validation constraints.
 
 ## Next Steps
 
@@ -218,27 +260,43 @@ Our development roadmap includes:
 - 🔄 **Optimize token usage** - Refining prompts and implementing caching strategies to reduce API costs
 - 🔄 **Working on testing automation** - Building comprehensive test suite for reliability across diverse inputs
 - 🔄 **Integrate with UX team with current design system** - Ensuring visual consistency with InterChat's interface
-- 🔄 **Working on last part of human feedback function** - Implementing the feedback processing system for iterative refinement
+- ✅ **Human feedback function completed** - The feedback processing system for iterative refinement is now fully implemented
+- 🔄 **Working on schema validation system** - Building automatic validation and testing of generated schemas
 
 ## Example Output
 
 ```json
 {
-  "schema": [
+  "name": "Stock Price Data",
+  "description": "Historical stock price data with daily trading information",
+  "columns": [
     {
-      "column_name": "Date",
+      "name": "Date",
       "type": "date",
-      "description": "Trading date for the stock"
+      "python_type": "datetime.date",
+      "description": "Trading date for the stock",
+      "nullable": false,
+      "format": "YYYY-MM-DD"
     },
     {
-      "column_name": "Open",
+      "name": "Open",
       "type": "number",
-      "description": "Opening price of the stock for the day"
+      "python_type": "float",
+      "description": "Opening price of the stock for the day",
+      "nullable": false,
+      "constraints": {
+        "minimum": 0
+      }
     },
     {
-      "column_name": "High",
+      "name": "High",
       "type": "number",
-      "description": "Highest price of the stock during the day"
+      "python_type": "float",
+      "description": "Highest price of the stock during the day",
+      "nullable": false,
+      "constraints": {
+        "minimum": 0
+      }
     }
     // Additional columns...
   ]
@@ -276,11 +334,12 @@ html_schema_converter/            # Main package directory
 ├── agents/                       # Agent modules
 │   ├── html_reader.py            # HTML parsing agent
 │   ├── table_analyzer.py         # Table analysis agent
-│   └── schema_generator.py       # Schema generation agent
+│   ├── schema_generator.py       # Schema generation agent
+│   └── schema_refiner.py         # Schema refinement with human feedback
 ├── models/                       # Data models
-│   └── schema.py                 # Schema data structures
+│   └── schema.py                 # Enhanced schema data structures with type validation
 ├── utils/                        # Utility functions
-│   ├── metrics.py                # Metrics collection
+│   ├── metrics.py                # Advanced metrics collection with segregated tracking
 │   ├── kaggle.py                 # Kaggle integration
 │   └── formatters.py             # Output formatting
 └── llm/                          # LLM integration

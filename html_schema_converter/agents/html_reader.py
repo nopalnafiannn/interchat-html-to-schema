@@ -113,8 +113,19 @@ class HTMLReader:
         # Extract headers
         headers = self._extract_headers(table)
         
+        # Handle duplicate headers by appending index to duplicates
+        seen_headers = {}
+        unique_headers = []
+        for i, header in enumerate(headers):
+            if header in seen_headers:
+                seen_headers[header] += 1
+                unique_headers.append(f"{header}_{seen_headers[header]}")
+            else:
+                seen_headers[header] = 0
+                unique_headers.append(header)
+        
         # Extract sample data
-        sample_data = self._extract_sample_data(table, headers)
+        sample_data = self._extract_sample_data(table, unique_headers)
         
         # Extract caption or context
         caption = self._extract_caption(table)
@@ -122,9 +133,9 @@ class HTMLReader:
         return {
             "table_id": table_id,
             "caption": caption,
-            "column_count": len(headers),
+            "column_count": len(unique_headers),
             "row_count": len(sample_data),
-            "headers": headers,
+            "headers": unique_headers,
             "sample_data": sample_data
         }
     

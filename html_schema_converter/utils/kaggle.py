@@ -9,6 +9,7 @@ from typing import Dict, List, Any, Optional, Tuple
 
 from html_schema_converter.config import config
 from html_schema_converter.agents.schema_generator import SchemaGenerator
+from html_schema_converter.models.schema import Schema, SchemaColumn
 
 class KaggleIntegration:
     """Handles integration with Kaggle datasets."""
@@ -116,10 +117,30 @@ class KaggleIntegration:
             # Read sample of CSV file
             df = pd.read_csv(csv_file, nrows=100)
         except Exception as e:
-            return {"schema": None, "error": f"Error reading CSV: {str(e)}"}
+            print(f"DEBUG: Error reading CSV: {str(e)}")
+            # Create a default schema object instead of returning None
+            default_schema = Schema(
+                name=f"CSV Schema: {os.path.basename(csv_file)}",
+                description=f"Error reading CSV file: {str(e)}"
+            )
+            return {"schema": default_schema, "error": f"Error reading CSV: {str(e)}"}
         
         # Extract headers and sample data
         headers = list(df.columns)
+        
+        # Create fallback columns for the schema in case everything else fails
+        fallback_columns = []
+        for header in headers:
+            fallback_columns.append(SchemaColumn(
+                name=header,
+                type="string",
+                description=f"Column containing {header} data",
+                nullable=True,
+                inferred=True,
+                confidence=0.5
+            ))
+        
+        # Get a sample of the data
         sample_data = df.head(5).values.tolist()
         
         # Create table_info dict in the same format used for HTML tables
@@ -128,8 +149,57 @@ class KaggleIntegration:
             "sample_data": sample_data
         }
         
-        # Generate schema
-        return self.schema_generator.generate_schema(table_info)
+        try:
+            # Generate schema
+            result = self.schema_generator.generate_schema(table_info)
+            
+            # Debug information to track what's returned
+            print(f"DEBUG: Schema type: {type(result.get('schema'))}")
+            
+            # Ensure we return a Schema object and not a dictionary
+            if result.get("schema") is None:
+                # Create an empty schema object rather than returning None
+                print(f"DEBUG: Creating fallback Schema object for null schema")
+                result["schema"] = Schema(
+                    name=f"CSV Schema: {os.path.basename(csv_file)}",
+                    description=f"Generated schema for {os.path.basename(csv_file)}",
+                    columns=fallback_columns
+                )
+                print(f"DEBUG: Created fallback Schema object: {type(result['schema'])}")
+            elif not isinstance(result["schema"], Schema):
+                print(f"DEBUG: Converting dictionary to Schema object")
+                if isinstance(result["schema"], dict):
+                    try:
+                        result["schema"] = Schema.from_dict(result["schema"])
+                        print(f"DEBUG: Successfully converted to Schema object: {type(result['schema'])}")
+                    except Exception as e:
+                        print(f"DEBUG: Schema conversion error: {str(e)}")
+                        print(f"DEBUG: Dictionary content: {result['schema']}")
+                        # Create a fallback schema instead of returning an error
+                        result["schema"] = Schema(
+                            name=f"CSV Schema: {os.path.basename(csv_file)}",
+                            description=f"Fallback schema due to conversion error: {str(e)}",
+                            columns=fallback_columns
+                        )
+                else:
+                    print(f"DEBUG: Unexpected schema type: {type(result['schema'])}")
+                    # Create a fallback schema instead of returning an error
+                    result["schema"] = Schema(
+                        name=f"CSV Schema: {os.path.basename(csv_file)}",
+                        description=f"Fallback schema due to unexpected type: {type(result['schema'])}",
+                        columns=fallback_columns
+                    )
+            
+            return result
+        except Exception as e:
+            print(f"DEBUG: Unexpected error in generate_csv_schema: {str(e)}")
+            # Create a fallback schema in case everything fails
+            fallback_schema = Schema(
+                name=f"CSV Schema: {os.path.basename(csv_file)}",
+                description=f"Fallback schema due to unexpected error: {str(e)}",
+                columns=fallback_columns
+            )
+            return {"schema": fallback_schema, "error": f"Unexpected error: {str(e)}"}
     
     def process_dataset(self, url: str) -> Dict[str, Any]:
         """
@@ -170,12 +240,13 @@ class KaggleIntegration:
             "csv_files": csv_files
         }
     
-    def interactive_csv_selection(self, csv_files: List[str]) -> Optional[str]:
+    def interactive_csv_selection(self, csv_files: List[str], auto_select: bool = False) -> Optional[str]:
         """
         Interactive selection of CSV file.
         
         Args:
             csv_files: List of CSV file paths
+            auto_select: If True, automatically select the first CSV file
             
         Returns:
             Selected CSV file path or None if invalid selection
@@ -184,10 +255,28 @@ class KaggleIntegration:
         for i, file in enumerate(csv_files):
             print(f"{i+1}. {file}")
             
-        choice = input(f"Choose a CSV file (1-{len(csv_files)}): ")
+        # Default to auto-select in non-interactive environments
+        if (auto_select and csv_files) or not csv_files:
+            if csv_files:
+                print(f"Auto-selecting file 1: {csv_files[0]}")
+                return csv_files[0]
+            else:
+                return None
+            
+        try:
+            choice = input(f"Choose a CSV file (1-{len(csv_files)}): ")
+        except EOFError:
+            # Handle non-interactive environment
+            print("Non-interactive environment detected. Auto-selecting first CSV file.")
+            if csv_files:
+                return csv_files[0]
+            return None
+        
         try:
             selected_csv = csv_files[int(choice)-1]
             return selected_csv
         except (IndexError, ValueError):
-            print("Invalid selection.")
+            print("Invalid selection. Auto-selecting first CSV file.")
+            if csv_files:
+                return csv_files[0]
             return None

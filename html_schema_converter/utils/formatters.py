@@ -10,7 +10,7 @@ class SchemaFormatter:
     """Handles formatting of schemas into different output formats."""
     
     @staticmethod
-    def format_schema(schema: Schema, format_type: str = "text") -> str:
+    def format_schema(schema, format_type: str = "text") -> str:
         """
         Format a schema according to the specified format type.
         
@@ -21,8 +21,18 @@ class SchemaFormatter:
         Returns:
             Formatted string representation of the schema
         """
+        # Import Schema class at the beginning of the function to ensure it's in scope
+        from html_schema_converter.models.schema import Schema
+        
         if not isinstance(schema, Schema):
-            raise TypeError(f"Expected Schema object, got {type(schema)}")
+            # Try to convert dict to Schema if possible
+            if isinstance(schema, dict):
+                try:
+                    schema = Schema.from_dict(schema)
+                except Exception as e:
+                    raise TypeError(f"Failed to convert dict to Schema: {str(e)}")
+            else:
+                raise TypeError(f"Expected Schema object, got {type(schema)}")
         
         format_type = format_type.lower()
         
@@ -55,17 +65,36 @@ class SchemaFormatter:
             return str(schema_dict)
     
     @staticmethod
-    def save_schema(schema: Schema, output_path: str, format_type: str = None) -> None:
+    def save_schema(schema, output_path: str, format_type: str = None) -> None:
         """
         Save a schema to a file.
         
         Args:
-            schema: Schema object to save
+            schema: Schema object or dictionary to save
             output_path: Path to save the schema to
             format_type: Optional format type override, otherwise inferred from file extension
         """
+        # Import Schema class at the beginning of the function to ensure it's in scope
+        from html_schema_converter.models.schema import Schema
+        
+        # Check if we need to convert a dictionary to Schema
         if not isinstance(schema, Schema):
-            raise TypeError("Expected Schema object")
+            # Try to convert dict to Schema if possible
+            if isinstance(schema, dict):
+                try:
+                    schema = Schema.from_dict(schema)
+                except Exception as e:
+                    # If conversion fails, just format the dictionary directly
+                    print(f"Warning: Failed to convert dict to Schema: {str(e)}")
+                    with open(output_path, "w", encoding="utf-8") as f:
+                        if format_type == "yaml":
+                            f.write(yaml.dump(schema, sort_keys=False, default_flow_style=False))
+                        else:
+                            f.write(json.dumps(schema, indent=2))
+                    print(f"Schema saved to {output_path} as a raw dictionary")
+                    return
+            else:
+                raise TypeError(f"Expected Schema object or dict, got {type(schema)}")
         
         # Infer format type from file extension if not specified
         if format_type is None:
@@ -77,7 +106,10 @@ class SchemaFormatter:
                 format_type = "text"
         
         # Format the schema
-        formatted_schema = SchemaFormatter.format_schema(schema, format_type)
+        if format_type == "yaml":
+            formatted_schema = schema.to_yaml()
+        else:
+            formatted_schema = schema.to_json()
         
         # Save to file
         with open(output_path, "w", encoding="utf-8") as f:
@@ -86,7 +118,7 @@ class SchemaFormatter:
         print(f"Schema saved to {output_path}")
     
     @staticmethod
-    def parse_schema_from_string(schema_string: str, format_type: str = "json") -> Schema:
+    def parse_schema_from_string(schema_string: str, format_type: str = "json") -> 'Schema':
         """
         Parse a schema from a string representation.
         
@@ -97,6 +129,9 @@ class SchemaFormatter:
         Returns:
             Parsed Schema object
         """
+        # Import Schema class at the beginning of the function to ensure it's in scope
+        from html_schema_converter.models.schema import Schema, SchemaColumn
+        
         format_type = format_type.lower()
         
         try:
@@ -127,9 +162,12 @@ class SchemaFormatter:
                 columns.append(col)
             
             # Create and return the Schema object
-            return Schema(name=name, description=description, columns=columns, metadata=metadata)
+            schema_obj = Schema(name=name, description=description, columns=columns, metadata=metadata)
+            return schema_obj
             
         except (json.JSONDecodeError, yaml.YAMLError) as e:
             raise ValueError(f"Failed to parse schema string: {str(e)}")
         except KeyError as e:
             raise ValueError(f"Missing required key in schema: {str(e)}")
+        except Exception as e:
+            raise ValueError(f"Error creating Schema object: {str(e)}")

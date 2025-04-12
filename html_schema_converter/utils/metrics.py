@@ -4,7 +4,7 @@ import time
 import os
 import psutil
 import functools
-from typing import Dict, Any, Callable, Optional
+from typing import Dict, Any, Callable, Optional, List
 
 def track_metrics(func: Callable) -> Callable:
     """
@@ -57,48 +57,96 @@ class MetricsCollector:
     """Collects and aggregates metrics from different operations."""
     
     def __init__(self):
-        """Initialize an empty metrics collection."""
-        self.metrics = []
+        """Initialize empty metrics collections for initial generation and feedback iterations."""
+        self.initial_metrics = []  # Metrics for initial LLM generation
+        self.feedback_metrics = []  # Metrics for human feedback iterations
     
-    def add_metrics(self, metrics_dict: Dict[str, Any], agent_name: Optional[str] = None) -> None:
+    def add_metrics(self, metrics_dict: Dict[str, Any], agent_name: Optional[str] = None, is_feedback: bool = False) -> None:
         """
-        Add metrics from an operation.
+        Add metrics from an operation, separating initial generation from feedback iterations.
         
         Args:
             metrics_dict: Dictionary of metrics
             agent_name: Optional name of the agent that produced the metrics
+            is_feedback: Flag indicating if these metrics are from a feedback iteration
         """
         metrics_entry = metrics_dict.copy()
         if agent_name:
             metrics_entry["Agent"] = agent_name
-        self.metrics.append(metrics_entry)
+        
+        # Add to the appropriate collection based on whether this is feedback or initial generation
+        if is_feedback:
+            self.feedback_metrics.append(metrics_entry)
+        else:
+            self.initial_metrics.append(metrics_entry)
     
     def get_metrics_report(self) -> Dict[str, Any]:
         """
-        Generate a summary report of collected metrics.
+        Generate a detailed summary report of collected metrics, separating initial generation 
+        from feedback iterations to provide more accurate performance insights.
         
         Returns:
-            Dictionary with metrics summary
+            Dictionary with separated metrics summaries
         """
-        if not self.metrics:
+        if not self.initial_metrics and not self.feedback_metrics:
             return {"message": "No metrics collected"}
         
+        # Process initial generation metrics
+        initial_summary = self._calculate_summary(self.initial_metrics, "Initial Generation")
+        
+        # Process feedback iteration metrics
+        feedback_summary = self._calculate_summary(self.feedback_metrics, "Feedback Iterations")
+        
+        # Combine summaries
+        combined_latency = initial_summary.get("Total Processing Time (s)", 0) + \
+                         feedback_summary.get("Total Processing Time (s)", 0)
+        
+        combined_tokens = initial_summary.get("Total Tokens", 0) + \
+                         feedback_summary.get("Total Tokens", 0)
+        
+        # Create comprehensive summary
+        summary = {
+            "Total Agents": len(self.initial_metrics) + len(self.feedback_metrics),
+            "Total Processing Time (s)": round(combined_latency, 3),
+            "Total Tokens": combined_tokens,
+            "Initial Generation": initial_summary,
+            "Feedback Iterations": feedback_summary,
+            "Initial Generation Metrics": self.initial_metrics,
+            "Feedback Iteration Metrics": self.feedback_metrics
+        }
+        
+        return summary
+    
+    def _calculate_summary(self, metrics_list: List[Dict[str, Any]], category: str) -> Dict[str, Any]:
+        """
+        Calculate summary statistics for a list of metrics.
+        
+        Args:
+            metrics_list: List of metrics dictionaries
+            category: Category name for the metrics group
+            
+        Returns:
+            Summary dictionary for the metrics group
+        """
+        if not metrics_list:
+            return {"message": f"No {category.lower()} metrics collected"}
+        
         # Calculate total latency
-        total_latency = sum(m.get("Latency (s)", 0) for m in self.metrics)
+        total_latency = sum(m.get("Latency (s)", 0) for m in metrics_list)
         
         # Calculate total token usage if available
-        total_prompt_tokens = sum(m.get("Prompt Tokens", 0) for m in self.metrics)
-        total_completion_tokens = sum(m.get("Completion Tokens", 0) for m in self.metrics)
-        total_tokens = sum(m.get("Total Tokens", 0) for m in self.metrics)
+        total_prompt_tokens = sum(m.get("Prompt Tokens", 0) for m in metrics_list)
+        total_completion_tokens = sum(m.get("Completion Tokens", 0) for m in metrics_list)
+        total_tokens = sum(m.get("Total Tokens", 0) for m in metrics_list)
         
         # Create summary
-        summary = {
-            "Total Agents": len(self.metrics),
+        return {
+            "Category": category,
+            "Number of Operations": len(metrics_list),
             "Total Processing Time (s)": round(total_latency, 3),
             "Total Prompt Tokens": total_prompt_tokens,
             "Total Completion Tokens": total_completion_tokens,
             "Total Tokens": total_tokens,
-            "Detailed Metrics": self.metrics
+            "Average Processing Time (s)": round(total_latency / max(1, len(metrics_list)), 3),
+            "Average Tokens per Operation": round(total_tokens / max(1, len(metrics_list)), 1)
         }
-        
-        return summary

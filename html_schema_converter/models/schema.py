@@ -1,6 +1,9 @@
 """Schema data structures for HTML to Data Schema Converter."""
 
-from typing import List, Dict, Any, Optional, Union
+try:
+    from typing import List, Dict, Any, Optional, Union
+except ImportError:
+    from typing_extensions import List, Dict, Any, Optional, Union
 from dataclasses import dataclass, field, asdict
 import json
 import yaml
@@ -10,18 +13,25 @@ class SchemaColumn:
     """Represents a column in the data schema."""
     
     name: str  # Changed from column_name to name for consistency
-    type: str
+    type: str  # Primary data type (e.g., int, float, str, list, etc.)
     description: str
     nullable: bool = True
     confidence: float = 1.0
     sample_values: List[Any] = field(default_factory=list)
     inferred: bool = False
+    python_type: str = ""  # Python-specific type for more precise type definition
+    format: str = ""  # Format specification (e.g., date format, number format)
+    constraints: Dict[str, Any] = field(default_factory=dict)  # Constraints like min/max values, regex patterns
     
     def __post_init__(self):
         """Initialize attributes after creation."""
         # For backwards compatibility
         if not hasattr(self, 'name') and hasattr(self, 'column_name'):
             self.name = self.column_name
+        
+        # Ensure type is always populated
+        if not self.type and self.python_type:
+            self.type = self.python_type
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary, excluding internal fields."""
@@ -36,6 +46,15 @@ class SchemaColumn:
             result["confidence"] = self.confidence
         if self.inferred:
             result["inferred"] = True
+        
+        # Include enhanced type information when available
+        if self.python_type:
+            result["python_type"] = self.python_type
+        if self.format:
+            result["format"] = self.format
+        if self.constraints:
+            result["constraints"] = self.constraints
+            
         return result
 
 @dataclass
@@ -110,10 +129,36 @@ class Schema:
         Returns:
             Schema instance
         """
+        # Clean up the text before parsing
+        cleaned_text = json_str.strip()
+        
+        # Remove markdown code block markers if present
+        if cleaned_text.startswith("```json"):
+            cleaned_text = cleaned_text[7:]
+        elif cleaned_text.startswith("```"):
+            cleaned_text = cleaned_text[3:]
+        
+        if cleaned_text.endswith("```"):
+            cleaned_text = cleaned_text[:-3]
+        
+        cleaned_text = cleaned_text.strip()
+        
         try:
-            data = json.loads(json_str)
+            data = json.loads(cleaned_text)
             return cls.from_dict(data)
         except json.JSONDecodeError as e:
+            # Try to find valid JSON within the text
+            start_idx = cleaned_text.find("{")
+            end_idx = cleaned_text.rfind("}")
+            
+            if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+                try:
+                    extracted_json = cleaned_text[start_idx:end_idx+1]
+                    data = json.loads(extracted_json)
+                    return cls.from_dict(data)
+                except json.JSONDecodeError:
+                    pass
+            
             raise ValueError(f"Invalid JSON: {e}")
     
     def to_dict(self) -> Dict[str, Any]:

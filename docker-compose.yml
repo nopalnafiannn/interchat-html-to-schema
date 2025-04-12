@@ -1,0 +1,14 @@
+version: '3'
+
+services:
+  html-to-schema:
+    build: .
+    volumes:
+      - ./:/app
+      - ./output:/app/output
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - KAGGLE_USERNAME=${KAGGLE_USERNAME}
+      - KAGGLE_SECRET_KEY=${KAGGLE_SECRET_KEY}
+    # Example command to override the default CMD in Dockerfile
+    # command: --url https://example.com/table.html --output /app/output/schema.json --format json
