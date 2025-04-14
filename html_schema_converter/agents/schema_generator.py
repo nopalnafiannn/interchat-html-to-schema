@@ -31,15 +31,38 @@ class SchemaGenerator:
         """
         headers = table_info.get('headers', [])
         rows = table_info.get('sample_data', [])
+        is_vertical_structure = table_info.get('is_vertical_structure', False)
         
         if not headers or not rows:
             return {"status": "No data found", "schema_data": []}
+        
+        # For vertical tables like AdventureWorks, the headers are already property names
+        # and sample_data contains the values for those properties in the same order
+        if is_vertical_structure:
+            # Check if this is from CSV schema format with explicit property names/values
+            if 'property_names' in table_info and 'property_values' in table_info:
+                return {
+                    "status": "Success",
+                    "original_headers": table_info['property_names'],
+                    "schema_data": [table_info['property_values']],
+                    "has_sample_data": True,
+                    "is_vertical_structure": True,
+                    "is_schema_csv": True
+                }
+            return {
+                "status": "Success",
+                "original_headers": headers,
+                "schema_data": rows,
+                "has_sample_data": bool(rows),
+                "is_vertical_structure": True
+            }
             
         return {
             "status": "Success",
             "original_headers": headers,
             "schema_data": rows,
-            "has_sample_data": bool(rows)
+            "has_sample_data": bool(rows),
+            "is_vertical_structure": False
         }
     
     @track_metrics
@@ -88,9 +111,19 @@ class SchemaGenerator:
         headers = extracted_data["original_headers"]
         sample_rows = extracted_data["schema_data"][:5]
         has_sample_data = extracted_data["has_sample_data"]
+        is_vertical_structure = extracted_data.get("is_vertical_structure", False)
         
         # Create the appropriate prompt
-        if has_sample_data:
+        is_schema_csv = extracted_data.get("is_schema_csv", False)
+        original_headers = extracted_data.get("original_headers", headers)
+        
+        if is_schema_csv:
+            # For CSV files containing database schema information
+            prompt = self._create_prompt_schema_csv(headers, sample_rows, original_headers)
+        elif is_vertical_structure:
+            # For vertical tables (property-value pairs like in AdventureWorks)
+            prompt = self._create_prompt_vertical_table(headers, sample_rows)
+        elif has_sample_data:
             prompt = self._create_prompt_with_samples(headers, sample_rows)
         else:
             prompt = self._create_prompt_column_names_only(headers)
@@ -233,8 +266,7 @@ Generate valid JSON describing each column in the format:
   "columns": [
     {{
       "name": "ColumnName",
-      "type": "string/number/date/boolean/object/array/null",
-      "python_type": "str/int/float/list/tuple/dict/bool/bytes/NoneType/etc.",
+      "type": "string/int/float/date/boolean/object/array/null",
       "description": "A short description of the column",
       "nullable": true,
       "format": "Optional format specification like YYYY-MM-DD for dates",
@@ -248,9 +280,12 @@ Generate valid JSON describing each column in the format:
   ]
 }}
 
-- Use the header text as "name".
+- CRITICALLY IMPORTANT: Use the EXACT header text as the "name" for each column. Do not modify, rename, or merge header names.
+- If column names include empty strings, "_1", or other unusual names, preserve them exactly as is.
+- Create a schema column for EVERY header in the list, even if some appear to be unusual or not meaningful.
+- For example, if headers are ["", "_1", "Key", "Name", "Data type"], create 5 columns with those exact names.
 - Infer accurate "type" based on sample data (e.g., string, number, date).
-- Provide the precise "python_type" that matches Python's type system (e.g., str, int, float, list).
+- Use specific data types for the "type" field (e.g., int, float, string, boolean).
 - When appropriate, add a "format" field for date formats, number formats, etc.
 - Add "constraints" when values follow clear patterns (only include relevant constraints).
 - Make inferences based on both column names and actual values in the data.
@@ -261,6 +296,146 @@ Generate valid JSON describing each column in the format:
 """
         return prompt
     
+    def _create_prompt_vertical_table(self, properties: List[str], values: List[List[str]]) -> str:
+        """
+        Create a prompt for schema generation when dealing with a vertical property-value table.
+        
+        Args:
+            properties: List of property names from the first column
+            values: List of property values from the second column
+            
+        Returns:
+            Prompt string
+        """
+        print(f"DEBUG schema_generator: Creating prompt for vertical table")
+        print(f"DEBUG schema_generator: Property names: {properties[:5]}")
+        print(f"DEBUG schema_generator: Values: {values[0][:5] if values and len(values) > 0 else 'None'}")
+        
+        # Combine properties and values for display in the prompt
+        property_value_pairs = []
+        if values and len(values) > 0:
+            # Ensure we don't go out of bounds
+            value_list = values[0]
+            for i, prop in enumerate(properties):
+                if i < len(value_list):
+                    pair = f"{prop}: {value_list[i]}"
+                    property_value_pairs.append(pair)
+                    print(f"DEBUG schema_generator: Added pair: {pair}")
+                else:
+                    property_value_pairs.append(f"{prop}: (no value)")
+                    
+        prop_value_text = "\n".join(property_value_pairs)
+        print(f"DEBUG schema_generator: Created {len(property_value_pairs)} property-value pairs for prompt")
+        
+        prompt = f"""
+You are a data extraction engine. I have a vertical property-value table from a database schema documentation.
+The first column contains property names and the second column contains their corresponding values.
+
+Here are the property-value pairs:
+{prop_value_text}
+
+This describes a database table or entity in a data model. Generate valid JSON for a schema that captures all these properties
+in the format:
+
+{{
+  "name": "The table name found in the properties",
+  "description": "A comprehensive description of the table based on the properties",
+  "columns": [
+    {{
+      "name": "column_name",
+      "type": "string/int/float/date/boolean/object/array/null",
+      "description": "Description of the column",
+      "nullable": true,
+      "format": "Optional format specification like YYYY-MM-DD for dates",
+      "constraints": {{
+        "minimum": 0,          # Optional min value for numbers
+        "maximum": 100,        # Optional max value for numbers
+        "pattern": "^[A-Z].*"  # Optional regex pattern for strings
+      }}
+    }},
+    ...
+  ]
+}}
+
+- Extract the table name, column information, primary key, foreign keys and other properties from the data
+- If there are columns listed in the properties, create a schema column entry for each one
+- If the list of columns is not explicitly provided, create a reasonable schema based on the nature of the table
+- Infer accurate types based on property descriptions or values
+- Only include constraints when they can be determined from the data
+- Output only valid JSON. Do not include extra text.
+"""
+        return prompt
+        
+    def _create_prompt_schema_csv(self, property_names: List[str], property_values: List[List[str]], original_headers: List[str] = None) -> str:
+        """
+        Create a prompt for schema generation for CSV files that contain database schema information.
+        
+        Args:
+            property_names: List of property names
+            property_values: List containing a single list of property values
+            original_headers: Original CSV headers before any processing
+            
+        Returns:
+            Prompt string
+        """
+        # Combine properties and values for display in the prompt
+        property_value_pairs = []
+        
+        if original_headers:
+            headers_text = f"Original CSV Headers: {str(original_headers)}"
+        else:
+            headers_text = f"Property Names: {str(property_names)}"
+        
+        if property_values and len(property_values) > 0:
+            # We expect a single row of values
+            value_list = property_values[0]
+            for i, prop in enumerate(property_names):
+                if i < len(value_list):
+                    pair = f"{prop}: {value_list[i]}"
+                    property_value_pairs.append(pair)
+                else:
+                    property_value_pairs.append(f"{prop}: (no value)")
+                    
+        prop_value_text = "\n".join(property_value_pairs)
+        
+        prompt = f"""
+You are a database schema analyzer. I have a CSV file that describes a database table schema with column definitions. The file has a list of properties and values that describe the columns in the table.
+
+Here are the headers from the file:
+{headers_text}
+
+Here are the property-value pairs extracted from the file:
+{prop_value_text}
+
+This describes a database table with its columns and their properties. Generate valid JSON for a data schema that captures this table structure in the format:
+
+{{
+  "name": "The table name derived from context",
+  "description": "A description of the table's purpose based on the column information",
+  "columns": [
+    {{
+      "name": "column_name",
+      "type": "The appropriate data type (string, int, float, boolean, etc.)",
+      "description": "Description of what this column contains",
+      "nullable": true or false (based on the 'Null' attribute),
+      "primary_key": true or false (based on 'Key' attribute),
+      "foreign_key": "Referenced table.column if applicable"
+    }},
+    ...
+  ]
+}}
+
+- CRITICALLY IMPORTANT: Each column in the schema must match EXACTLY with one of the header fields in the CSV file. Do not create new column names or merge header fields.
+- For CSV files with headers like "", "_1", "Key", "Name", "Data type", create a column in the schema for EACH of these headers using their exact names.
+- Use the EXACT headers as column names in your schema, preserving the exact spelling, case, and even empty string headers.
+- If a header is empty or just whitespace, still create a column for it with that empty name.
+- If columns have names like "_1", they should get schema columns with exactly that name "_1".
+- Use the rows beneath the headers to determine the appropriate data types and properties of each column.
+- Do not make up column names that don't appear in the headers - use only the headers that were actually present.
+- Output only valid JSON. Do not include extra text.
+"""
+        return prompt
+
     def _create_prompt_column_names_only(self, headers: List[str]) -> str:
         """
         Create a prompt for schema generation when only column names are available.
@@ -285,8 +460,7 @@ Generate valid JSON describing each column in the format:
   "columns": [
     {{
       "name": "ColumnName",
-      "type": "string/number/date/boolean/object/array/null",
-      "python_type": "str/int/float/list/tuple/dict/bool/bytes/NoneType/etc.",
+      "type": "string/int/float/date/boolean/object/array/null",
       "description": "A short description of the column",
       "nullable": true,
       "inferred": true,
@@ -302,9 +476,12 @@ Generate valid JSON describing each column in the format:
   ]
 }}
 
-- Use the header text as "name".
+- CRITICALLY IMPORTANT: Use the EXACT header text as the "name" for each column. Do not modify, rename, or merge header names.
+- If column names include empty strings, "_1", or other unusual names, preserve them exactly as is.
+- Create a schema column for EVERY header in the list, even if some appear to be unusual or not meaningful.
+- For example, if headers are ["", "_1", "Key", "Name", "Data type"], create 5 columns with those exact names.
 - Infer "type" based on common naming conventions (using JSON schema types).
-- Specify the most likely "python_type" based on column name conventions.
+- Use specific data types for the "type" field like int, float, etc.
 - Add a "confidence" score between 0.0 and 1.0 to indicate your confidence in the type inference.
 - Include "inferred": true for all columns to indicate this is based only on column names.
 - Add format and constraints fields when column names strongly suggest specific patterns.
@@ -476,8 +653,8 @@ Generate valid JSON describing each column in the format:
                 # Handle both naming conventions
                 col_name = col_data.get("name", col_data.get("column_name", ""))
                 
-                # If we don't have a valid column name or type, create a default entry
-                if not col_name:
+                # Allow empty string column names - don't replace them
+                if col_name is None:  # Only replace if truly None, not empty string
                     print(f"DEBUG: Missing column name in {col_data}")
                     # Try to create a placeholder name
                     col_name = f"Column_{len(columns) + 1}"
@@ -492,7 +669,6 @@ Generate valid JSON describing each column in the format:
                     nullable=col_data.get("nullable", True),
                     confidence=col_data.get("confidence", 1.0),
                     inferred=col_data.get("inferred", not has_sample_data),
-                    python_type=col_data.get("python_type", ""),
                     format=col_data.get("format", ""),
                     constraints=col_data.get("constraints", {})
                 )

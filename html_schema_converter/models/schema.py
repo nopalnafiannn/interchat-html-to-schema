@@ -19,7 +19,6 @@ class SchemaColumn:
     confidence: float = 1.0
     sample_values: List[Any] = field(default_factory=list)
     inferred: bool = False
-    python_type: str = ""  # Python-specific type for more precise type definition
     format: str = ""  # Format specification (e.g., date format, number format)
     constraints: Dict[str, Any] = field(default_factory=dict)  # Constraints like min/max values, regex patterns
     
@@ -29,9 +28,9 @@ class SchemaColumn:
         if not hasattr(self, 'name') and hasattr(self, 'column_name'):
             self.name = self.column_name
         
-        # Ensure type is always populated
-        if not self.type and self.python_type:
-            self.type = self.python_type
+        # Ensure type is always populated (legacy support)
+        if not self.type and hasattr(self, 'python_type') and getattr(self, 'python_type'):
+            self.type = getattr(self, 'python_type')
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary, excluding internal fields."""
@@ -48,8 +47,6 @@ class SchemaColumn:
             result["inferred"] = True
         
         # Include enhanced type information when available
-        if self.python_type:
-            result["python_type"] = self.python_type
         if self.format:
             result["format"] = self.format
         if self.constraints:
