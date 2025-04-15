@@ -1,6 +1,6 @@
 # HTML to Data Schema Converter for InterChat
 
-**[MILESTONE 3 ASSIGNMENT - AI PM COURSE, CARNEGIE MELLON UNIVERSITY]**
+**[MILESTONE 4 ASSIGNMENT - AI PM COURSE, CARNEGIE MELLON UNIVERSITY]**
 
 A specialized tool designed to automatically extract and generate structured data schemas from HTML tables for use with the InterChat visual analytics system.
 
@@ -12,7 +12,7 @@ This converter uses a multi-agent architecture powered by BeautifulSoup for HTML
 
 ## Refined Workflow Architecture
 
-In milestone 3, we have refined our approach with an enhanced workflow that better handles multiple input sources and processing paths:
+In milestone 4, we have enhanced our system with a public Streamlit interface, human feedback processing, and containerization:
 
 ![HTML to Data Schema Converter Workflow](images/images_workflow.jpg)
 
@@ -34,10 +34,17 @@ Our refined architecture now features:
      - Schema Generator 2: Works with limited data (column names only)
 
 4. **Feedback Processing System**
-   - New schema refiner agent that incorporates human feedback
+   - **NEW:** Fully implemented human feedback loop for refinement
+   - **NEW:** Interactive feedback collection through the Streamlit interface
    - Enhanced type inference with precise Python types
    - Separate performance metrics tracking for feedback iterations
    - Human-in-the-loop refinement with data validation constraints
+
+5. **Public Web Interface**
+   - **NEW:** Streamlit-powered user interface accessible publicly
+   - **NEW:** Docker containerization for easy deployment
+   - Intuitive workflow with visual table previews
+   - Simplified schema editing and feedback collection
 
 ## Features
 
@@ -66,6 +73,7 @@ Our refined architecture now features:
   - Preview before saving
 
 - **User Experience**
+  - **NEW:** Public Streamlit web interface
   - Interactive step-by-step interface
   - Command-line interface for automation
   - Performance metrics reporting
@@ -121,11 +129,17 @@ Set up your API keys using any of these methods:
 
 ## Usage
 
-### Streamlit UI (Recommended)
+### Streamlit Web Interface (Recommended)
 
-The Streamlit UI provides a modern, user-friendly interface:
+Our Streamlit UI is now publicly accessible at: [https://interchat-schema-converter.streamlit.app](https://interchat-schema-converter.streamlit.app)
+
+You can also run the Streamlit interface locally:
 
 ```bash
+# Install Streamlit if you haven't already
+pip install streamlit
+
+# Run the Streamlit app
 streamlit run streamlit_app.py
 ```
 
@@ -175,6 +189,23 @@ python -m html_schema_converter.main --url https://example.com/page-with-table.h
 python -m html_schema_converter.main --url https://example.com/page-with-table.html --feedback "The Date column should be datetime format YYYY-MM-DD and the Price column should be a positive float with 2 decimal places."
 ```
 
+### Using Docker
+
+We now provide Docker support for easy deployment and consistent environments:
+
+```bash
+# Build the Docker image
+docker build -t interchat-schema-converter .
+
+# Run the container with Streamlit interface
+docker run -p 8501:8501 -e OPENAI_API_KEY=your_api_key interchat-schema-converter
+
+# Run the container with command-line interface
+docker run -e OPENAI_API_KEY=your_api_key interchat-schema-converter python interactive_converter.py
+```
+
+The Docker image contains all necessary dependencies and configurations, ensuring consistent behavior across different environments.
+
 ## System Architecture
 
 The system uses a multi-agent architecture with specialized components:
@@ -217,7 +248,8 @@ The system uses a multi-agent architecture with specialized components:
 3. Table Analyzer helps select the most relevant table (if multiple exist)
 4. Schema Generator creates appropriate LLM prompts based on available data
 5. LLM generates schema components (data types and descriptions)
-6. Output is formatted, displayed, and saved
+6. Schema Refiner processes any human feedback for refinement
+7. Output is formatted, displayed, and saved
 
 ## Performance Metrics
 
@@ -248,20 +280,34 @@ The current implementation includes:
 - ✅ Schema Generator (types 1 & 2)
 - ✅ Interactive and CLI interfaces
 - ✅ Kaggle integration
+- ✅ Schema Refinement with human feedback
 - ✅ Performance metrics
 - ✅ Multiple output formats
+- ✅ Public Streamlit interface
+- ✅ Docker containerization
 
-✅ Schema Refinement with human feedback is now fully implemented. The system can accept human feedback to further refine data types and add validation constraints.
+## Next Steps (Milestone 5)
 
-## Next Steps
+Our development roadmap for Milestone 5 includes:
 
-Our development roadmap includes:
+- 🔄 **API Development for Frontend Integration** - Building a Flask RESTful API that allows:
+  - Schema generation endpoints for direct integration with frontend applications
+  - Authentication and rate limiting for secure access
+  - Comprehensive API documentation using Swagger/OpenAPI
+  - Support for asynchronous processing of large tables
 
-- 🔄 **Optimize token usage** - Refining prompts and implementing caching strategies to reduce API costs
-- 🔄 **Working on testing automation** - Building comprehensive test suite for reliability across diverse inputs
-- 🔄 **Integrate with UX team with current design system** - Ensuring visual consistency with InterChat's interface
-- ✅ **Human feedback function completed** - The feedback processing system for iterative refinement is now fully implemented
-- 🔄 **Working on schema validation system** - Building automatic validation and testing of generated schemas
+- 🔄 **Enhanced Performance Metrics System** - Implementing:
+  - Real-time token usage tracking with optimization suggestions
+  - Latency analysis with bottleneck identification
+  - Memory profiling for large-scale processing
+  - Feedback loop effectiveness metrics
+  - Dashboard for visualizing performance trends
+
+- 🔄 **User Touchpoint Analysis** - Conducting:
+  - Comprehensive user journey mapping
+  - Identification of friction points in the workflow
+  - Analytics integration for usage patterns
+  - Targeted improvements for high-impact touchpoints
 
 ## Example Output
 
@@ -303,6 +349,18 @@ Our development roadmap includes:
 }
 ```
 
+## Docker Configuration
+
+Our Docker implementation provides a consistent, isolated environment for running the HTML to Data Schema Converter. The `Dockerfile` handles:
+
+1. **Environment Setup**: Creates a consistent Python environment with all dependencies
+2. **Dependency Management**: Installs all required packages automatically
+3. **Configuration**: Sets up environment variables and system paths
+4. **Port Exposure**: Makes the Streamlit interface accessible
+5. **Startup Commands**: Configures the default behavior (Streamlit UI)
+
+This containerization approach ensures that the tool runs consistently across different operating systems and environments, eliminating "it works on my machine" problems.
+
 ## Troubleshooting
 
 ### Common Issues
@@ -310,6 +368,7 @@ Our development roadmap includes:
 - **API Key Errors**: Ensure your OpenAI API key is correctly set in the environment or .env file
 - **No Tables Found**: Verify the HTML source contains proper table elements
 - **Schema Generation Fails**: Check the complexity of the table; very large tables may exceed token limits
+- **Docker Issues**: Make sure to expose port 8501 when running the Docker container for Streamlit access
 
 ### Requirements
 
@@ -323,6 +382,7 @@ openai>=1.0.0
 psutil>=5.9.0
 kaggle>=1.5.12
 python-dotenv>=1.0.0
+streamlit>=1.24.0
 ```
 
 ## Project Structure
@@ -331,6 +391,9 @@ python-dotenv>=1.0.0
 html_schema_converter/            # Main package directory
 ├── main.py                       # Entry point
 ├── config.py                     # Configuration management
+├── Dockerfile                    # Docker configuration
+├── docker-compose.yml            # Docker Compose configuration
+├── streamlit_app.py              # Streamlit interface
 ├── agents/                       # Agent modules
 │   ├── html_reader.py            # HTML parsing agent
 │   ├── table_analyzer.py         # Table analysis agent
