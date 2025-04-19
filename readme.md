@@ -1,6 +1,6 @@
 # HTML to Data Schema Converter for InterChat
 
-**[MILESTONE 4 ASSIGNMENT - AI PM COURSE, CARNEGIE MELLON UNIVERSITY]**
+**[AI for PM COURSE, CARNEGIE MELLON UNIVERSITY]**
 
 A specialized tool designed to automatically extract and generate structured data schemas from HTML tables for use with the InterChat visual analytics system.
 
