@@ -23,7 +23,7 @@ class OpenAIClient:
         openai.api_key = api_key
         self.client = OpenAI(api_key=api_key)
     
-    def generate(self, prompt: str, model: str = "gpt-3.5-turbo", 
+    def generate(self, prompt: str, model: str = "gpt-4o-mini", 
                  system_message: str = None, max_tokens: int = 1000, 
                  temperature: float = 0) -> Dict[str, Any]:
         """

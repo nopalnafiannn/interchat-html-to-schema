@@ -8,3 +8,4 @@ kaggle>=1.5.12
 python-dotenv>=1.0.0
 streamlit>=1.26.0
 typing-extensions>=4.0.0
+plotly>=5.10.0
