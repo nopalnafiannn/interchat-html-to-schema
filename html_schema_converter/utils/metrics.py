@@ -30,7 +30,7 @@ def track_metrics(func: Callable) -> Callable:
         mem_after = psutil.Process(os.getpid()).memory_info().rss
         
         latency = end_time - start_time
-        mem_usage = (mem_after - mem_before) / (1024 * 1024)  # Convert to MB
+        mem_usage = abs(mem_after - mem_before) / (1024 * 1024)  # Convert to MB
         
         # Add metrics to result if it's a dict
         if isinstance(result, dict):
